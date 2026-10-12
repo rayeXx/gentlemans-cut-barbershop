@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Portal Aslab SIBER - Sistem Autentikasi Login Gmail",
-  description: "Aplikasi Web Portal Autentikasi Asisten Laboratorium Siber & Jaringan - Ujian CPMK",
+  title: "The Gentleman's Cut Barbershop — Premium Grooming & Online Booking",
+  description: "SaaS Platform & Online Booking Barbershop Modern untuk Pelanggan dan Kasir POS",
 };
 
 export default function RootLayout({

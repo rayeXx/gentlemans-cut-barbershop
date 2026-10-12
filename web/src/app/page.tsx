@@ -1,446 +1,599 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { GoogleIcon } from "@/components/GoogleIcon";
-import { supabase, isSupabaseConfigured, signInWithGoogle, signOut } from "@/lib/supabase";
 import { 
+  Barber, 
+  ServiceItem, 
+  Booking, 
+  MemberSubscription, 
+  ToastMessage, 
+  BookingStatus 
+} from "@/types/barbershop";
+import { 
+  INITIAL_BARBERS, 
+  INITIAL_SERVICES, 
+  INITIAL_BOOKINGS, 
+  INITIAL_SUBSCRIPTIONS 
+} from "@/lib/mockData";
+import { Navbar } from "@/components/Navbar";
+import { ToastContainer } from "@/components/ui/Toast";
+import { BookingWizard } from "@/components/customer/BookingWizard";
+import { ServiceCatalog } from "@/components/customer/ServiceCatalog";
+import { MembershipSection } from "@/components/customer/MembershipSection";
+import { BookingSuccessModal } from "@/components/customer/BookingSuccessModal";
+import { CheckBookingModal } from "@/components/customer/CheckBookingModal";
+import { AdminLoginModal } from "@/components/admin/AdminLoginModal";
+import { AdminDashboard } from "@/components/admin/AdminDashboard";
+import { AppointmentTable } from "@/components/admin/AppointmentTable";
+import { ServiceManagementModal } from "@/components/admin/ServiceManagementModal";
+import { MembershipManagementView } from "@/components/admin/MembershipManagementView";
+import { QuickWalkInModal } from "@/components/admin/QuickWalkInModal";
+import { 
+  Scissors, 
+  Calendar, 
+  Sparkles, 
   ShieldCheck, 
-  Lock, 
-  Mail, 
-  Eye, 
-  EyeOff, 
-  Server, 
-  Smartphone, 
-  CheckCircle2, 
-  LogOut, 
-  Terminal, 
-  KeyRound,
-  AlertCircle,
-  ExternalLink,
-  Laptop
+  LayoutDashboard, 
+  ListOrdered, 
+  Layers, 
+  Users, 
+  PhoneCall, 
+  MapPin, 
+  Clock, 
+  Star 
 } from "lucide-react";
 
-interface UserProfile {
-  name: string;
-  email: string;
-  avatar: string;
-  role: string;
-  provider: string;
-}
+export default function BarbershopApp() {
+  // Theme state: defaults to light (cerah modern barbershop)
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const isDark = theme === "dark";
 
-export default function LoginPage() {
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
-  const [emailInput, setEmailInput] = useState("");
-  const [passwordInput, setPasswordInput] = useState("");
-  const [demoNotice, setDemoNotice] = useState(true);
+  // Role & Auth state
+  const [currentRole, setCurrentRole] = useState<"customer" | "admin">("customer");
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+  const [isAdminLoginModalOpen, setIsAdminLoginModalOpen] = useState(false);
 
-  // Cek apakah ada session aktif dari Supabase jika dikonfigurasi
+  // Customer Navigation Tab
+  const [activeCustomerTab, setActiveCustomerTab] = useState<"booking" | "services" | "membership">("booking");
+  const [preselectedServiceId, setPreselectedServiceId] = useState<string | undefined>(undefined);
+
+  // Admin Navigation Tab
+  const [activeAdminTab, setActiveAdminTab] = useState<"overview" | "queue" | "services" | "members">("overview");
+
+  // Local Storage Mock Database State
+  const [barbers, setBarbers] = useState<Barber[]>(INITIAL_BARBERS);
+  const [services, setServices] = useState<ServiceItem[]>(INITIAL_SERVICES);
+  const [bookings, setBookings] = useState<Booking[]>(INITIAL_BOOKINGS);
+  const [subscriptions, setSubscriptions] = useState<MemberSubscription[]>(INITIAL_SUBSCRIPTIONS);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  // Modals state
+  const [confirmedBooking, setConfirmedBooking] = useState<Booking | null>(null);
+  const [isCheckBookingModalOpen, setIsCheckBookingModalOpen] = useState(false);
+  const [isQuickWalkInModalOpen, setIsQuickWalkInModalOpen] = useState(false);
+
+  // Toasts state
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  // Toast Helper
+  const addToast = (title: string, message: string, type: ToastMessage["type"] = "success") => {
+    const id = `toast-${Date.now()}`;
+    setToasts((prev) => [...prev, { id, title, message, type }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4500);
+  };
+
+  const removeToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  // Load from localStorage on mount
   useEffect(() => {
-    if (isSupabaseConfigured && supabase) {
-      supabase.auth.getUser().then(({ data: { user } }) => {
-        if (user) {
-          setUser({
-            name: user.user_metadata?.full_name || user.email?.split("@")[0] || "Asisten Lab",
-            email: user.email || "aslab@siber.ac.id",
-            avatar: user.user_metadata?.avatar_url || "https://api.dicebear.com/7.x/bottts/svg?seed=siber",
-            role: "Asisten Lab Siber",
-            provider: "Google OAuth (Supabase)",
-          });
-        }
-      });
+    try {
+      const savedBarbers = localStorage.getItem("gentleman_barbers");
+      if (savedBarbers) setBarbers(JSON.parse(savedBarbers));
 
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-        if (session?.user) {
-          setUser({
-            name: session.user.user_metadata?.full_name || session.user.email?.split("@")[0] || "Asisten Lab",
-            email: session.user.email || "aslab@siber.ac.id",
-            avatar: session.user.user_metadata?.avatar_url || "https://api.dicebear.com/7.x/bottts/svg?seed=siber",
-            role: "Asisten Lab Siber",
-            provider: "Google OAuth (Supabase)",
-          });
-        } else {
-          setUser(null);
-        }
-      });
+      const savedServices = localStorage.getItem("gentleman_services");
+      if (savedServices) setServices(JSON.parse(savedServices));
 
-      return () => subscription.unsubscribe();
+      const savedBookings = localStorage.getItem("gentleman_bookings");
+      if (savedBookings) setBookings(JSON.parse(savedBookings));
+
+      const savedSubs = localStorage.getItem("gentleman_subscriptions");
+      if (savedSubs) setSubscriptions(JSON.parse(savedSubs));
+
+      const savedTheme = localStorage.getItem("gentleman_theme");
+      if (savedTheme === "dark" || savedTheme === "light") setTheme(savedTheme);
+    } catch (e) {
+      console.error("Failed to load local database", e);
+    } finally {
+      setIsLoaded(true);
     }
   }, []);
 
-  // Handler Login dengan Google (Gmail)
-  const handleGoogleLogin = async () => {
-    setIsLoading(true);
-    setErrorMsg(null);
+  // Save to localStorage when state changes
+  useEffect(() => {
+    if (!isLoaded) return;
+    try {
+      localStorage.setItem("gentleman_barbers", JSON.stringify(barbers));
+      localStorage.setItem("gentleman_services", JSON.stringify(services));
+      localStorage.setItem("gentleman_bookings", JSON.stringify(bookings));
+      localStorage.setItem("gentleman_subscriptions", JSON.stringify(subscriptions));
+      localStorage.setItem("gentleman_theme", theme);
+    } catch (e) {
+      console.error("Failed to persist local database", e);
+    }
+  }, [barbers, services, bookings, subscriptions, theme, isLoaded]);
 
-    if (isSupabaseConfigured) {
-      try {
-        await signInWithGoogle();
-      } catch (err: unknown) {
-        const error = err as Error;
-        setErrorMsg(error.message || "Gagal menghubungi Supabase Google OAuth");
-        setIsLoading(false);
+  // Handle Role Switch
+  const handleRoleToggle = (targetRole: "customer" | "admin") => {
+    if (targetRole === "admin") {
+      if (!isAdminLoggedIn) {
+        setIsAdminLoginModalOpen(true);
+      } else {
+        setCurrentRole("admin");
       }
     } else {
-      // Mock Login Simulator untuk demonstrasi langsung ke dosen
-      setTimeout(() => {
-        setUser({
-          name: "Rayhan F (Aslab SIBER)",
-          email: "rayhan.f@gmail.com",
-          avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
-          role: "Asisten Laboratorium Keamanan Siber",
-          provider: "Google Identity (Demo Mode)",
-        });
-        setIsLoading(false);
-      }, 900);
+      setCurrentRole("customer");
     }
   };
 
-  // Handler Login Manual (Email/Password)
-  const handleManualLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!emailInput) {
-      setErrorMsg("Silakan masukkan email atau gunakan tombol Login dengan Google");
-      return;
-    }
-    setIsLoading(true);
-    setTimeout(() => {
-      setUser({
-        name: emailInput.split("@")[0] || "Staff Siber",
-        email: emailInput,
-        avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=security",
-        role: "Praktikan / Aslab",
-        provider: "Internal Auth",
-      });
-      setIsLoading(false);
-    }, 700);
+  const handleAdminLoginSuccess = () => {
+    setIsAdminLoggedIn(true);
+    setIsAdminLoginModalOpen(false);
+    setCurrentRole("admin");
+    addToast("Login Admin Berhasil", "Selamat datang di Kasir & POS The Gentleman's Cut", "success");
   };
 
-  const handleLogout = async () => {
-    if (isSupabaseConfigured) {
-      await signOut();
+  const handleAdminLogout = () => {
+    setIsAdminLoggedIn(false);
+    setCurrentRole("customer");
+    addToast("Logout Selesai", "Anda telah kembali ke tampilan Pelanggan", "info");
+  };
+
+  // Booking handlers
+  const handleAddBooking = (newBooking: Booking) => {
+    setBookings((prev) => [newBooking, ...prev]);
+
+    // If payment method is membership_quota, automatically decrement quota for that member
+    if (newBooking.paymentMethod === "membership_quota") {
+      setSubscriptions((prev) =>
+        prev.map((sub) => {
+          if (
+            sub.status === "active" &&
+            sub.customerPhone.replace(/\D/g, "") === newBooking.customerPhone.replace(/\D/g, "") &&
+            typeof sub.quotaRemaining === "number" &&
+            sub.quotaRemaining > 0
+          ) {
+            return {
+              ...sub,
+              quotaRemaining: sub.quotaRemaining - 1,
+            };
+          }
+          return sub;
+        })
+      );
     }
-    setUser(null);
+
+    addToast(
+      "Reservasi Dikonfirmasi!",
+      `Kode Booking: ${newBooking.bookingCode} atas nama ${newBooking.customerName}`,
+      "success"
+    );
+  };
+
+  const handleUpdateBookingStatus = (bookingId: string, status: BookingStatus) => {
+    setBookings((prev) =>
+      prev.map((b) => (b.id === bookingId ? { ...b, status } : b))
+    );
+    addToast("Status Diperbarui", `Sesi booking telah diubah menjadi ${status}`, "info");
+  };
+
+  const handleDeleteBooking = (bookingId: string) => {
+    setBookings((prev) => prev.filter((b) => b.id !== bookingId));
+    addToast("Booking Dihapus", "Data reservasi berhasil dihapus dari sistem", "warning");
+  };
+
+  // Service CRUD handlers
+  const handleAddService = (newService: ServiceItem) => {
+    setServices((prev) => [...prev, newService]);
+    addToast("Layanan Ditambahkan", `${newService.name} berhasil masuk katalog`, "success");
+  };
+
+  const handleUpdateService = (updated: ServiceItem) => {
+    setServices((prev) =>
+      prev.map((s) => (s.id === updated.id ? updated : s))
+    );
+    addToast("Layanan Diperbarui", `${updated.name} telah disimpan`, "success");
+  };
+
+  const handleDeleteService = (serviceId: string) => {
+    setServices((prev) => prev.filter((s) => s.id !== serviceId));
+    addToast("Layanan Dihapus", "Layanan telah dihapus dari katalog", "warning");
+  };
+
+  // Subscription handlers
+  const handleAddSubscription = (sub: MemberSubscription) => {
+    setSubscriptions((prev) => [sub, ...prev]);
+    addToast(
+      "Membership Diaktifkan! 👑",
+      `${sub.customerName} resmi menjadi member ${sub.planName}`,
+      "success"
+    );
+  };
+
+  const handleUpdateSubscriptionQuota = (id: string, newQuota: number | "unlimited") => {
+    setSubscriptions((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, quotaRemaining: newQuota } : s))
+    );
+    addToast("Kuota Diperbarui", "Sisa kuota member berhasil diubah", "info");
+  };
+
+  const handleDeleteSubscription = (id: string) => {
+    setSubscriptions((prev) => prev.filter((s) => s.id !== id));
+    addToast("Member Dihapus", "Data membership berhasil dihapus", "warning");
+  };
+
+  // Switch to Booking tab from Service Catalog
+  const handleSelectServiceForBooking = (serviceId: string) => {
+    setPreselectedServiceId(serviceId);
+    setActiveCustomerTab("booking");
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between selection:bg-cyan-500 selection:text-black relative overflow-hidden font-sans">
-      {/* Background Cyber Glow Effects */}
-      <div className="absolute top-0 left-1/4 w-96 h-96 bg-cyan-600/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
-      <div 
-        className="absolute inset-0 opacity-[0.03] pointer-events-none"
-        style={{
-          backgroundImage: `radial-gradient(circle at 1px 1px, white 1px, transparent 0)`,
-          backgroundSize: "28px 28px",
-        }}
+    <div
+      className={`min-h-screen flex flex-col transition-colors duration-200 font-sans selection:bg-amber-500 selection:text-slate-950 ${
+        isDark
+          ? "bg-slate-950 text-slate-100"
+          : "bg-stone-50 text-stone-900"
+      }`}
+    >
+      {/* Toast Notification Container */}
+      <ToastContainer toasts={toasts} onDismiss={removeToast} />
+
+      {/* Main Responsive Navbar */}
+      <Navbar
+        currentRole={currentRole}
+        isAdminLoggedIn={isAdminLoggedIn}
+        onRoleToggle={handleRoleToggle}
+        onAdminLogout={handleAdminLogout}
+        theme={theme}
+        onThemeToggle={() => setTheme(isDark ? "light" : "dark")}
+        onOpenCheckBooking={() => setIsCheckBookingModalOpen(true)}
+        activeCustomerTab={activeCustomerTab}
+        setActiveCustomerTab={setActiveCustomerTab}
       />
 
-      {/* Header Bar */}
-      <header className="border-b border-slate-800/80 bg-slate-950/70 backdrop-blur-md px-6 py-4 flex items-center justify-between sticky top-0 z-20">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-500/10 border border-cyan-500/30 text-cyan-400">
-            <ShieldCheck className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="font-bold tracking-wider text-sm text-slate-200 flex items-center gap-2">
-              ASLAB SIBER
-              <span className="text-[10px] bg-cyan-950/80 text-cyan-400 border border-cyan-800/60 px-2 py-0.5 rounded-full font-mono">
-                SECURITY OPS
+      {/* Hero Brand Banner for Customer View */}
+      {currentRole === "customer" && activeCustomerTab === "booking" && (
+        <div
+          className={`border-b py-10 px-4 sm:px-6 relative overflow-hidden transition ${
+            isDark
+              ? "bg-gradient-to-r from-slate-950 via-slate-900 to-amber-950/40 border-slate-800/80"
+              : "bg-gradient-to-r from-amber-100/90 via-amber-50 to-stone-100 border-amber-200/80"
+          }`}
+        >
+          {/* Subtle Accent Glows */}
+          <div className="absolute top-0 right-1/4 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="max-w-5xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+            <div className="space-y-2">
+              <span className="text-[11px] font-bold tracking-widest uppercase text-amber-600 dark:text-amber-400 font-mono flex items-center gap-1.5">
+                <Scissors className="w-4 h-4" />
+                THE GENTLEMAN&apos;S CUT • JAKARTA
               </span>
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold font-serif tracking-tight">
+                Penampilan Sempurna, <br className="hidden sm:inline" />
+                Dimulai dari Kursi Kami.
+              </h1>
+              <p className={`text-xs sm:text-sm max-w-xl ${isDark ? "text-slate-400" : "text-stone-600"}`}>
+                Reservasi jadwal potong rambut, cukur jenggot royal hot shave, dan treatment kepala tanpa antre. Nikmati kenyamanan lounge dan kopi premium gratis.
+              </p>
             </div>
-            <p className="text-xs text-slate-500">Laboratorium Keamanan Siber & Jaringan</p>
-          </div>
-        </div>
 
-        <div className="flex items-center gap-3">
-          <div className="hidden sm:flex items-center gap-2 text-xs text-slate-400 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-lg font-mono">
-            <Terminal className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Next.js • Node.js • Vercel Ready</span>
-          </div>
-          {user && (
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 bg-red-950/40 border border-red-900/50 px-3 py-1.5 rounded-lg transition"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>Keluar</span>
-            </button>
-          )}
-        </div>
-      </header>
-
-      {/* Main Content Area */}
-      <main className="flex-1 flex items-center justify-center p-4 sm:p-6 z-10">
-        {user ? (
-          /* ======================================================== */
-          /* TAMPILAN DASHBOARD SETELAH LOGIN GOOGLE BERHASIL          */
-          /* ======================================================== */
-          <div className="w-full max-w-4xl space-y-6 animate-in fade-in zoom-in-95 duration-300 py-6">
-            {/* Banner Sukses CPMK */}
-            <div className="bg-gradient-to-r from-emerald-950/60 to-cyan-950/60 border border-emerald-500/40 rounded-2xl p-5 shadow-xl backdrop-blur-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-3.5">
-                <div className="p-3 bg-emerald-500/20 text-emerald-400 rounded-xl border border-emerald-500/30">
-                  <CheckCircle2 className="w-6 h-6" />
+            {/* Quick Stats Badges */}
+            <div className="flex flex-wrap sm:flex-col gap-3 shrink-0">
+              <div
+                className={`p-3.5 rounded-2xl border flex items-center gap-3 backdrop-blur-sm ${
+                  isDark ? "bg-slate-900/80 border-slate-800" : "bg-white/90 border-amber-200 shadow-sm"
+                }`}
+              >
+                <div className="p-2 rounded-xl bg-amber-500/10 text-amber-500">
+                  <Star className="w-5 h-5 fill-amber-500 text-amber-500" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-emerald-300 text-base">
-                    Verifikasi Login with Gmail Berhasil! 🎉
-                  </h3>
-                  <p className="text-xs text-slate-300 mt-0.5">
-                    Kriteria CPMK: Autentikasi akun Google telah terhubung dan siap dipresentasikan ke Dosen.
-                  </p>
+                  <span className="font-bold text-sm block">4.9 / 5.0 Rating</span>
+                  <span className="text-[11px] opacity-70">500+ Pelanggan Puas</span>
                 </div>
               </div>
-              <div className="bg-slate-900/80 border border-slate-800 px-3 py-1.5 rounded-xl text-right">
-                <span className="text-[10px] text-slate-400 block font-mono">STATUS CPMK</span>
-                <span className="text-xs font-semibold text-emerald-400">SIAP DIUJI</span>
-              </div>
-            </div>
 
-            {/* Profile Card */}
-            <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-6 backdrop-blur-md">
-              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
-                <img
-                  src={user.avatar}
-                  alt={user.name}
-                  className="w-20 h-20 rounded-2xl border-2 border-cyan-500/40 shadow-lg object-cover"
-                />
-                <div className="text-center sm:text-left flex-1">
-                  <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                    <h2 className="text-xl font-bold text-white">{user.name}</h2>
-                    <span className="bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 text-[11px] font-mono px-2 py-0.5 rounded-md">
-                      {user.role}
-                    </span>
-                  </div>
-                  <p className="text-slate-400 text-sm mt-1 flex items-center justify-center sm:justify-start gap-1.5">
-                    <Mail className="w-3.5 h-3.5 text-slate-500" />
-                    {user.email}
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2 justify-center sm:justify-start">
-                    <span className="text-[11px] bg-slate-800 text-slate-300 border border-slate-700/80 px-2.5 py-1 rounded-md font-mono">
-                      Metode: {user.provider}
-                    </span>
-                    <span className="text-[11px] bg-emerald-950/60 text-emerald-400 border border-emerald-800/60 px-2.5 py-1 rounded-md font-mono">
-                      Session: Active
-                    </span>
-                  </div>
+              <div
+                className={`p-3.5 rounded-2xl border flex items-center gap-3 backdrop-blur-sm ${
+                  isDark ? "bg-slate-900/80 border-slate-800" : "bg-white/90 border-amber-200 shadow-sm"
+                }`}
+              >
+                <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500">
+                  <Clock className="w-5 h-5" />
                 </div>
-                <button
-                  onClick={handleLogout}
-                  className="w-full sm:w-auto px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-medium transition flex items-center justify-center gap-2"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                  Logout
-                </button>
-              </div>
-            </div>
-
-            {/* Placeholder Modul (Sesuai Catatan Rapat Aslab SIBER) */}
-            <div className="space-y-3">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2 font-mono">
-                <Terminal className="w-4 h-4 text-cyan-400" />
-                Modul & Rencana Proyek Aslab SIBER (Dummy / Roadmap)
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Card 1: VPS & Server */}
-                <div className="bg-slate-900/50 border border-slate-800/80 p-5 rounded-2xl flex flex-col justify-between hover:border-slate-700 transition">
-                  <div>
-                    <div className="p-2.5 bg-blue-500/10 text-blue-400 rounded-xl border border-blue-500/20 w-fit mb-3">
-                      <Server className="w-5 h-5" />
-                    </div>
-                    <h5 className="font-semibold text-white text-sm">Server VPS & Docker</h5>
-                    <p className="text-xs text-slate-400 mt-1">
-                      Persiapan server VPS, Hermes Web di atas Docker, dan pelatihan konfigurasi server.
-                    </p>
-                  </div>
-                  <span className="mt-4 text-[11px] text-blue-400 font-mono bg-blue-950/40 border border-blue-900/40 px-2 py-1 rounded-md self-start">
-                    Status: Next Agenda
-                  </span>
-                </div>
-
-                {/* Card 2: Flutter Mobile */}
-                <div className="bg-slate-900/50 border border-slate-800/80 p-5 rounded-2xl flex flex-col justify-between hover:border-slate-700 transition">
-                  <div>
-                    <div className="p-2.5 bg-purple-500/10 text-purple-400 rounded-xl border border-purple-500/20 w-fit mb-3">
-                      <Smartphone className="w-5 h-5" />
-                    </div>
-                    <h5 className="font-semibold text-white text-sm">Aplikasi Mobile Flutter</h5>
-                    <p className="text-xs text-slate-400 mt-1">
-                      Klien mobile menggunakan Flutter yang tersambung ke backend & database yang sama.
-                    </p>
-                  </div>
-                  <span className="mt-4 text-[11px] text-purple-400 font-mono bg-purple-950/40 border border-purple-900/40 px-2 py-1 rounded-md self-start">
-                    Status: Tahap 2
-                  </span>
-                </div>
-
-                {/* Card 3: CI/CD Vercel & Supabase */}
-                <div className="bg-slate-900/50 border border-slate-800/80 p-5 rounded-2xl flex flex-col justify-between hover:border-slate-700 transition">
-                  <div>
-                    <div className="p-2.5 bg-cyan-500/10 text-cyan-400 rounded-xl border border-cyan-500/20 w-fit mb-3">
-                      <Laptop className="w-5 h-5" />
-                    </div>
-                    <h5 className="font-semibold text-white text-sm">Pipeline Vercel & Supabase</h5>
-                    <p className="text-xs text-slate-400 mt-1">
-                      Workflow vibe coding di Antigravity, edit di Cursor, push ke GitHub, auto-deploy di Vercel.
-                    </p>
-                  </div>
-                  <span className="mt-4 text-[11px] text-cyan-400 font-mono bg-cyan-950/40 border border-cyan-900/40 px-2 py-1 rounded-md self-start">
-                    Status: Active (Current)
-                  </span>
+                <div>
+                  <span className="font-bold text-sm block">Buka Setiap Hari</span>
+                  <span className="text-[11px] opacity-70">09:00 - 21:00 WIB</span>
                 </div>
               </div>
             </div>
           </div>
-        ) : (
-          /* ======================================================== */
-          /* TAMPILAN LOGIN FORM DENGAN GOOGLE (GMAIL) BUTTON        */
-          /* ======================================================== */
-          <div className="w-full max-w-md space-y-4 animate-in fade-in zoom-in-95 duration-200">
-            {/* Notice Banner */}
-            {demoNotice && (
-              <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 text-xs text-slate-300 flex items-start gap-2.5 backdrop-blur-sm">
-                <AlertCircle className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
-                <div className="flex-1 leading-relaxed">
-                  <span className="font-semibold text-cyan-300">Siap Ditampilkan ke Dosen:</span>{" "}
-                  Tombol login Google di bawah langsung berfungsi untuk demonstrasi UI & aliran autentikasi CPMK.
-                </div>
-                <button
-                  onClick={() => setDemoNotice(false)}
-                  className="text-slate-500 hover:text-slate-300 text-xs px-1"
-                >
-                  ✕
-                </button>
-              </div>
+        </div>
+      )}
+
+      {/* Sub-Header Tabs for Admin View */}
+      {currentRole === "admin" && (
+        <div
+          className={`border-b px-4 sm:px-6 lg:px-8 py-3 sticky top-20 z-30 backdrop-blur-md ${
+            isDark ? "bg-slate-950/90 border-slate-800" : "bg-white/90 border-amber-200"
+          }`}
+        >
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+              <button
+                onClick={() => setActiveAdminTab("overview")}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition ${
+                  activeAdminTab === "overview"
+                    ? isDark
+                      ? "bg-amber-500 text-slate-950 shadow"
+                      : "bg-amber-600 text-white shadow"
+                    : isDark
+                    ? "text-slate-400 hover:text-white"
+                    : "text-stone-600 hover:text-stone-900"
+                }`}
+              >
+                <LayoutDashboard className="w-3.5 h-3.5" />
+                <span>Ringkasan &amp; Metrik</span>
+              </button>
+
+              <button
+                onClick={() => setActiveAdminTab("queue")}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition ${
+                  activeAdminTab === "queue"
+                    ? isDark
+                      ? "bg-amber-500 text-slate-950 shadow"
+                      : "bg-amber-600 text-white shadow"
+                    : isDark
+                    ? "text-slate-400 hover:text-white"
+                    : "text-stone-600 hover:text-stone-900"
+                }`}
+              >
+                <ListOrdered className="w-3.5 h-3.5" />
+                <span>Antrean &amp; Kasir (POS)</span>
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-500/20 text-amber-400">
+                  {bookings.filter((b) => b.status === "scheduled" || b.status === "in_chair").length}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setActiveAdminTab("services")}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition ${
+                  activeAdminTab === "services"
+                    ? isDark
+                      ? "bg-amber-500 text-slate-950 shadow"
+                      : "bg-amber-600 text-white shadow"
+                    : isDark
+                    ? "text-slate-400 hover:text-white"
+                    : "text-stone-600 hover:text-stone-900"
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>Kelola Layanan (CRUD)</span>
+              </button>
+
+              <button
+                onClick={() => setActiveAdminTab("members")}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition ${
+                  activeAdminTab === "members"
+                    ? isDark
+                      ? "bg-amber-500 text-slate-950 shadow"
+                      : "bg-amber-600 text-white shadow"
+                    : isDark
+                    ? "text-slate-400 hover:text-white"
+                    : "text-stone-600 hover:text-stone-900"
+                }`}
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>Anggota Membership</span>
+              </button>
+            </div>
+
+            <span className="hidden md:inline-flex text-[11px] font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-2.5 py-1 rounded-lg">
+              ● POS Active (Kasir Utama)
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Main Content Area */}
+      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+        {/* ======================================================== */}
+        {/* CUSTOMER VIEWS                                          */}
+        {/* ======================================================== */}
+        {currentRole === "customer" && (
+          <div className="space-y-12">
+            {activeCustomerTab === "booking" && (
+              <BookingWizard
+                barbers={barbers}
+                services={services}
+                bookings={bookings}
+                subscriptions={subscriptions}
+                onAddBooking={handleAddBooking}
+                onBookingSuccess={(booking) => setConfirmedBooking(booking)}
+                isDark={isDark}
+                preselectedServiceId={preselectedServiceId}
+              />
             )}
 
-            {/* Login Card */}
-            <div className="bg-slate-900/80 border border-slate-800/90 rounded-2xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl relative">
-              <div className="text-center space-y-2 mb-6">
-                <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 mb-1">
-                  <KeyRound className="w-6 h-6" />
-                </div>
-                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
-                  Selamat Datang
-                </h1>
-                <p className="text-xs sm:text-sm text-slate-400">
-                  Portal Autentikasi Aslab SIBER & Ujian CPMK
-                </p>
-              </div>
+            {activeCustomerTab === "services" && (
+              <ServiceCatalog
+                services={services}
+                barbers={barbers}
+                onSelectServiceForBooking={handleSelectServiceForBooking}
+                isDark={isDark}
+              />
+            )}
 
-              {/* Error Alert */}
-              {errorMsg && (
-                <div className="mb-4 p-3 bg-red-950/60 border border-red-800/80 rounded-xl text-xs text-red-300 flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
-                  <span>{errorMsg}</span>
-                </div>
-              )}
+            {activeCustomerTab === "membership" && (
+              <MembershipSection
+                subscriptions={subscriptions}
+                onAddSubscription={handleAddSubscription}
+                isDark={isDark}
+              />
+            )}
+          </div>
+        )}
 
-              {/* TOMBOL UTAMA: LOGIN DENGAN GOOGLE / GMAIL */}
-              <div className="space-y-4">
-                <button
-                  type="button"
-                  onClick={handleGoogleLogin}
-                  disabled={isLoading}
-                  className="w-full flex items-center justify-center gap-3 bg-white hover:bg-slate-100 text-slate-800 font-medium py-3 px-4 rounded-xl shadow-md transition-all duration-200 transform active:scale-[0.99] disabled:opacity-70 disabled:cursor-not-allowed group"
-                >
-                  {isLoading ? (
-                    <div className="w-5 h-5 border-2 border-slate-400 border-t-slate-800 rounded-full animate-spin" />
-                  ) : (
-                    <GoogleIcon className="w-5 h-5 group-hover:scale-105 transition-transform" />
-                  )}
-                  <span className="text-sm font-semibold tracking-wide">
-                    {isLoading ? "Menghubungkan Akun Google..." : "Lanjutkan dengan Google"}
-                  </span>
-                </button>
+        {/* ======================================================== */}
+        {/* ADMIN / KASIR VIEWS                                      */}
+        {/* ======================================================== */}
+        {currentRole === "admin" && (
+          <div className="space-y-8">
+            {activeAdminTab === "overview" && (
+              <AdminDashboard
+                bookings={bookings}
+                barbers={barbers}
+                subscriptions={subscriptions}
+                onOpenQuickWalkIn={() => setIsQuickWalkInModalOpen(true)}
+                onUpdateStatus={handleUpdateBookingStatus}
+                isDark={isDark}
+              />
+            )}
 
-                {/* Garis Pemisah */}
-                <div className="relative flex items-center justify-center my-4">
-                  <div className="border-t border-slate-800 w-full" />
-                  <span className="bg-slate-900 px-3 text-[11px] text-slate-500 uppercase tracking-wider font-mono shrink-0">
-                    atau masuk manual
-                  </span>
-                  <div className="border-t border-slate-800 w-full" />
-                </div>
+            {activeAdminTab === "queue" && (
+              <AppointmentTable
+                bookings={bookings}
+                barbers={barbers}
+                onUpdateStatus={handleUpdateBookingStatus}
+                onDeleteBooking={handleDeleteBooking}
+                isDark={isDark}
+              />
+            )}
 
-                {/* Form Input Manual (Alternatif) */}
-                <form onSubmit={handleManualLogin} className="space-y-3.5">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
-                      <Mail className="w-3.5 h-3.5 text-slate-400" />
-                      Email / Akun Kampus
-                    </label>
-                    <input
-                      type="email"
-                      value={emailInput}
-                      onChange={(e) => setEmailInput(e.target.value)}
-                      placeholder="aslab@kampus.ac.id"
-                      className="w-full bg-slate-950/80 border border-slate-800 focus:border-cyan-500 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none transition"
-                    />
-                  </div>
+            {activeAdminTab === "services" && (
+              <ServiceManagementModal
+                services={services}
+                onAddService={handleAddService}
+                onUpdateService={handleUpdateService}
+                onDeleteService={handleDeleteService}
+                isDark={isDark}
+              />
+            )}
 
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
-                      <Lock className="w-3.5 h-3.5 text-slate-400" />
-                      Kata Sandi
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showPassword ? "text" : "password"}
-                        value={passwordInput}
-                        onChange={(e) => setPasswordInput(e.target.value)}
-                        placeholder="••••••••••••"
-                        className="w-full bg-slate-950/80 border border-slate-800 focus:border-cyan-500 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none transition pr-10"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 text-xs"
-                      >
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={isLoading}
-                    className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-medium py-2.5 px-4 rounded-xl text-sm transition shadow-lg shadow-cyan-900/30 flex items-center justify-center gap-2 mt-2"
-                  >
-                    Masuk ke Sistem
-                  </button>
-                </form>
-              </div>
-
-              {/* Status Footer di dalam Card */}
-              <div className="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-500 font-mono">
-                <span>OAuth 2.0 Ready</span>
-                <span>SSO Protocol v2</span>
-              </div>
-            </div>
-
-            {/* Quick Helper Note for CPMK */}
-            <div className="text-center text-xs text-slate-500">
-              Ujian CPMK Keamanan Siber • Lab SIBER & Node.js Vercel
-            </div>
+            {activeAdminTab === "members" && (
+              <MembershipManagementView
+                subscriptions={subscriptions}
+                onAddSubscription={handleAddSubscription}
+                onUpdateSubscriptionQuota={handleUpdateSubscriptionQuota}
+                onDeleteSubscription={handleDeleteSubscription}
+                isDark={isDark}
+              />
+            )}
           </div>
         )}
       </main>
 
+      {/* Modals */}
+      <AdminLoginModal
+        isOpen={isAdminLoginModalOpen}
+        onClose={() => setIsAdminLoginModalOpen(false)}
+        onLoginSuccess={handleAdminLoginSuccess}
+        isDark={isDark}
+      />
+
+      <BookingSuccessModal
+        booking={confirmedBooking}
+        onClose={() => setConfirmedBooking(null)}
+        isDark={isDark}
+      />
+
+      <CheckBookingModal
+        isOpen={isCheckBookingModalOpen}
+        onClose={() => setIsCheckBookingModalOpen(false)}
+        bookings={bookings}
+        isDark={isDark}
+        onOpenTicket={(b) => setConfirmedBooking(b)}
+      />
+
+      <QuickWalkInModal
+        isOpen={isQuickWalkInModalOpen}
+        onClose={() => setIsQuickWalkInModalOpen(false)}
+        barbers={barbers}
+        services={services}
+        onAddBooking={handleAddBooking}
+        isDark={isDark}
+      />
+
       {/* Footer */}
-      <footer className="border-t border-slate-900 bg-slate-950/60 px-6 py-3 text-center text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-2 z-10">
-        <div>
-          © 2026 Aslab SIBER — Vibe Coding with Antigravity & Cursor
-        </div>
-        <div className="flex items-center gap-4 text-slate-400">
-          <span className="hover:text-cyan-400 transition cursor-pointer">Panduan PRD</span>
-          <span>•</span>
-          <span className="hover:text-cyan-400 transition cursor-pointer">Supabase Auth</span>
-          <span>•</span>
-          <span className="hover:text-cyan-400 transition cursor-pointer">Vercel Deploy</span>
+      <footer
+        className={`border-t py-8 px-4 sm:px-6 lg:px-8 text-xs transition ${
+          isDark
+            ? "bg-slate-950/80 border-slate-900 text-slate-500"
+            : "bg-white border-amber-200 text-stone-500"
+        }`}
+      >
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20">
+              <Scissors className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="font-bold text-slate-300 dark:text-slate-300 font-serif">
+                The Gentleman&apos;s Cut Barbershop
+              </p>
+              <p className="text-[11px] opacity-70">
+                Senopati Branch &amp; Pondok Indah Branch • Jakarta
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-4 text-xs font-medium">
+            <span
+              onClick={() => {
+                setCurrentRole("customer");
+                setActiveCustomerTab("booking");
+              }}
+              className="cursor-pointer hover:text-amber-500 transition"
+            >
+              Booking Online
+            </span>
+            <span>•</span>
+            <span
+              onClick={() => {
+                setCurrentRole("customer");
+                setActiveCustomerTab("services");
+              }}
+              className="cursor-pointer hover:text-amber-500 transition"
+            >
+              Katalog Layanan
+            </span>
+            <span>•</span>
+            <span
+              onClick={() => {
+                setCurrentRole("customer");
+                setActiveCustomerTab("membership");
+              }}
+              className="cursor-pointer hover:text-amber-500 transition"
+            >
+              Grooming Pass VIP
+            </span>
+            <span>•</span>
+            <span
+              onClick={() => handleRoleToggle("admin")}
+              className="cursor-pointer hover:text-amber-500 transition font-mono font-bold"
+            >
+              Akses Admin Kasir (POS)
+            </span>
+          </div>
+
+          <p className="font-mono text-[11px]">
+            © 2026 The Gentleman&apos;s Cut. All rights reserved.
+          </p>
         </div>
       </footer>
     </div>
