@@ -337,7 +337,7 @@ export default function BarbershopApp() {
       className={`min-h-screen flex flex-col pb-16 md:pb-0 transition-colors duration-200 font-sans selection:bg-amber-500 selection:text-slate-950 ${
         isDark
           ? "bg-slate-950 text-slate-100"
-          : "bg-stone-50 text-stone-900"
+          : "bg-[#FDFBF7] text-stone-900"
       }`}
     >
       {/* Toast Notification Container */}
@@ -359,10 +359,10 @@ export default function BarbershopApp() {
         setActiveCustomerTab={setActiveCustomerTab}
       />
 
-      {/* Hero Brand Banner for Customer View */}
+      {/* Hero Brand Banner for Customer View (Desktop Only) */}
       {currentRole === "customer" && activeCustomerTab === "booking" && (
         <div
-          className={`border-b py-8 sm:py-10 px-4 sm:px-6 relative overflow-hidden transition ${
+          className={`hidden sm:block border-b py-8 sm:py-10 px-4 sm:px-6 relative overflow-hidden transition ${
             isDark
               ? "bg-gradient-to-r from-slate-950 via-slate-900 to-amber-950/40 border-slate-800/80"
               : "bg-gradient-to-r from-amber-100/90 via-amber-50 to-stone-100 border-amber-200/80"

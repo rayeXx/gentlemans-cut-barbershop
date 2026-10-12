@@ -237,21 +237,21 @@ export function BookingWizard({
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto space-y-8 animate-in fade-in duration-300">
+    <div className="w-full max-w-5xl mx-auto space-y-6 sm:space-y-8 animate-in fade-in duration-300">
       {/* Wizard Header Progress */}
       <div
-        className={`p-6 rounded-3xl border shadow-xl ${
+        className={`p-4 sm:p-6 rounded-2xl sm:rounded-3xl border ${
           isDark
-            ? "bg-slate-900/80 border-slate-800 text-slate-100"
-            : "bg-white border-amber-200 text-stone-900"
+            ? "bg-slate-900/80 border-slate-800 text-slate-100 shadow-xl"
+            : "bg-white border-stone-200/90 text-stone-900 shadow-sm"
         }`}
       >
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 sm:mb-6">
           <div>
-            <span className="text-[10px] uppercase font-bold tracking-widest text-amber-500 font-mono">
+            <span className="text-[10px] uppercase font-bold tracking-widest text-amber-600 dark:text-amber-400 font-mono">
               ONLINE RESERVATION ENGINE
             </span>
-            <h2 className="text-xl sm:text-2xl font-bold font-serif mt-0.5">
+            <h2 className="text-lg sm:text-2xl font-bold font-serif mt-0.5">
               Pesan Kursi Grooming Anda
             </h2>
             <p className={`text-xs ${isDark ? "text-slate-400" : "text-stone-500"}`}>
@@ -265,12 +265,12 @@ export function BookingWizard({
           </div>
 
           {/* Quick Price Indicator in Header */}
-          <div className="flex items-center gap-3">
-            <div className={`text-right px-4 py-2 rounded-2xl border ${
-              isDark ? "bg-slate-950 border-slate-800" : "bg-amber-50 border-amber-200"
+          <div className="flex items-center gap-3 self-end sm:self-auto">
+            <div className={`text-right px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl sm:rounded-2xl border ${
+              isDark ? "bg-slate-950 border-slate-800" : "bg-stone-50 border-stone-200"
             }`}>
-              <span className="text-[10px] text-slate-400 block font-mono">ESTIMASI TOTAL</span>
-              <span className="text-base sm:text-lg font-extrabold font-mono text-amber-500">
+              <span className="text-[9px] text-stone-400 block font-mono">ESTIMASI TOTAL</span>
+              <span className="text-sm sm:text-lg font-extrabold font-mono text-amber-600 dark:text-amber-500">
                 {formatRupiah(rawTotalPrice)}
               </span>
             </div>

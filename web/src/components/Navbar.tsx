@@ -50,43 +50,32 @@ export function Navbar({
       className={`sticky top-0 z-40 border-b backdrop-blur-md transition-colors duration-200 ${
         isDark
           ? "bg-slate-950/85 border-slate-800/80 text-slate-100"
-          : "bg-amber-50/90 border-amber-200/80 text-stone-900"
+          : "bg-[#FDFBF7]/90 border-amber-900/10 text-stone-900"
       }`}
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-14 sm:h-16">
           {/* Logo & Brand Name */}
           <div 
             onClick={onGoToLanding}
-            className="flex items-center gap-3 cursor-pointer group"
+            className="flex items-center gap-2 sm:gap-3 cursor-pointer group"
           >
             <div
-              className={`p-2.5 rounded-2xl border flex items-center justify-center shadow-md transition group-hover:scale-105 ${
+              className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl border flex items-center justify-center shadow-sm shrink-0 transition group-hover:scale-105 ${
                 isDark
-                  ? "bg-gradient-to-br from-amber-500/20 to-amber-700/10 border-amber-500/40 text-amber-400"
-                  : "bg-amber-100 border-amber-300 text-amber-800 shadow-amber-900/5"
+                  ? "bg-amber-500/20 border-amber-500/40 text-amber-400"
+                  : "bg-amber-100/80 border-amber-300 text-amber-800"
               }`}
             >
-              <Scissors className="w-6 h-6 transform -rotate-45" />
+              <Scissors className="w-4 h-4 transform -rotate-45" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-extrabold tracking-tight text-base sm:text-xl font-serif">
-                  The Gentleman&apos;s Cut
-                </span>
-                <span
-                  className={`hidden sm:inline-block text-[9px] uppercase font-bold tracking-widest px-2 py-0.5 rounded-full border ${
-                    isDark
-                      ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
-                      : "bg-amber-200/70 text-amber-900 border-amber-300"
-                  }`}
-                >
-                  Est. 2026
-                </span>
-              </div>
-              <p className={`text-[11px] sm:text-xs ${isDark ? "text-slate-400" : "text-stone-500"}`}>
-                Barbershop &amp; Online Booking
-              </p>
+            <div className="leading-tight">
+              <span className="font-extrabold tracking-tight text-sm sm:text-base font-serif block">
+                The Gentleman&apos;s Cut
+              </span>
+              <span className="text-[9px] text-amber-700 dark:text-amber-400 font-mono tracking-wider font-semibold hidden sm:inline">
+                BARBERSHOP
+              </span>
             </div>
           </div>
 
