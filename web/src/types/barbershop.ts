@@ -75,3 +75,12 @@ export interface ToastMessage {
   message: string;
   type: "success" | "error" | "info" | "warning";
 }
+
+export interface AuthUser {
+  id: string;
+  name: string;
+  email: string;
+  avatar: string;
+  role: "admin" | "customer";
+  provider: "google" | "password";
+}

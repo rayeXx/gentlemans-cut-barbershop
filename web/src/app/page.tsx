@@ -7,7 +7,8 @@ import {
   Booking, 
   MemberSubscription, 
   ToastMessage, 
-  BookingStatus 
+  BookingStatus,
+  AuthUser 
 } from "@/types/barbershop";
 import { 
   INITIAL_BARBERS, 
@@ -15,7 +16,10 @@ import {
   INITIAL_BOOKINGS, 
   INITIAL_SUBSCRIPTIONS 
 } from "@/lib/mockData";
+import { LandingPage } from "@/components/landing/LandingPage";
+import { LoginPage } from "@/components/auth/LoginPage";
 import { Navbar } from "@/components/Navbar";
+import { MobileBottomNav } from "@/components/mobile/MobileBottomNav";
 import { ToastContainer } from "@/components/ui/Toast";
 import { BookingWizard } from "@/components/customer/BookingWizard";
 import { ServiceCatalog } from "@/components/customer/ServiceCatalog";
@@ -30,17 +34,12 @@ import { MembershipManagementView } from "@/components/admin/MembershipManagemen
 import { QuickWalkInModal } from "@/components/admin/QuickWalkInModal";
 import { 
   Scissors, 
-  Calendar, 
-  Sparkles, 
-  ShieldCheck, 
   LayoutDashboard, 
   ListOrdered, 
   Layers, 
   Users, 
-  PhoneCall, 
-  MapPin, 
-  Clock, 
-  Star 
+  Star, 
+  Clock 
 } from "lucide-react";
 
 export default function BarbershopApp() {
@@ -48,9 +47,14 @@ export default function BarbershopApp() {
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const isDark = theme === "dark";
 
-  // Role & Auth state
+  // App Navigation Flow: 'landing' | 'login' | 'app'
+  const [currentView, setCurrentView] = useState<"landing" | "login" | "app">("landing");
+
+  // User Authentication State
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+
+  // Role state: 'customer' | 'admin'
   const [currentRole, setCurrentRole] = useState<"customer" | "admin">("customer");
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [isAdminLoginModalOpen, setIsAdminLoginModalOpen] = useState(false);
 
   // Customer Navigation Tab
@@ -105,6 +109,14 @@ export default function BarbershopApp() {
 
       const savedTheme = localStorage.getItem("gentleman_theme");
       if (savedTheme === "dark" || savedTheme === "light") setTheme(savedTheme);
+
+      const savedUser = localStorage.getItem("gentleman_auth_user");
+      if (savedUser) {
+        const parsedUser: AuthUser = JSON.parse(savedUser);
+        setAuthUser(parsedUser);
+        setCurrentRole(parsedUser.role);
+        setCurrentView("app");
+      }
     } catch (e) {
       console.error("Failed to load local database", e);
     } finally {
@@ -121,35 +133,73 @@ export default function BarbershopApp() {
       localStorage.setItem("gentleman_bookings", JSON.stringify(bookings));
       localStorage.setItem("gentleman_subscriptions", JSON.stringify(subscriptions));
       localStorage.setItem("gentleman_theme", theme);
+      if (authUser) {
+        localStorage.setItem("gentleman_auth_user", JSON.stringify(authUser));
+      } else {
+        localStorage.removeItem("gentleman_auth_user");
+      }
     } catch (e) {
       console.error("Failed to persist local database", e);
     }
-  }, [barbers, services, bookings, subscriptions, theme, isLoaded]);
+  }, [barbers, services, bookings, subscriptions, theme, authUser, isLoaded]);
+
+  // Handle Login Success (Otomatis Role Detection)
+  const handleLoginSuccess = (user: AuthUser) => {
+    setAuthUser(user);
+    setCurrentRole(user.role);
+    setCurrentView("app");
+    if (user.role === "admin") {
+      setActiveAdminTab("overview");
+      addToast(
+        "Selamat Datang, Admin! 👑",
+        `Masuk sebagai Kasir POS (${user.email})`,
+        "success"
+      );
+    } else {
+      setActiveCustomerTab("booking");
+      addToast(
+        "Login Berhasil! ✂️",
+        `Halo ${user.name}, selamat datang di Gentleman's Cut`,
+        "success"
+      );
+    }
+  };
+
+  // Handle Logout
+  const handleLogout = () => {
+    setAuthUser(null);
+    setCurrentRole("customer");
+    setCurrentView("landing");
+    addToast("Logout Berhasil", "Anda telah keluar dari akun", "info");
+  };
 
   // Handle Role Switch
   const handleRoleToggle = (targetRole: "customer" | "admin") => {
     if (targetRole === "admin") {
-      if (!isAdminLoggedIn) {
-        setIsAdminLoginModalOpen(true);
-      } else {
+      if (authUser?.role === "admin") {
         setCurrentRole("admin");
+      } else {
+        setIsAdminLoginModalOpen(true);
       }
     } else {
       setCurrentRole("customer");
     }
   };
 
-  const handleAdminLoginSuccess = () => {
-    setIsAdminLoggedIn(true);
-    setIsAdminLoginModalOpen(false);
+  const handleAdminModalLoginSuccess = () => {
+    const adminUser: AuthUser = {
+      id: "usr-admin-quick",
+      name: "Admin Kasir Barbershop",
+      email: "admin@gentlemanscut.com",
+      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
+      role: "admin",
+      provider: "password",
+    };
+    setAuthUser(adminUser);
     setCurrentRole("admin");
-    addToast("Login Admin Berhasil", "Selamat datang di Kasir & POS The Gentleman's Cut", "success");
-  };
-
-  const handleAdminLogout = () => {
-    setIsAdminLoggedIn(false);
-    setCurrentRole("customer");
-    addToast("Logout Selesai", "Anda telah kembali ke tampilan Pelanggan", "info");
+    setIsAdminLoginModalOpen(false);
+    setCurrentView("app");
+    addToast("Login Admin Berhasil", "Akses Kasir POS Terbuka", "success");
   };
 
   // Booking handlers
@@ -241,9 +291,50 @@ export default function BarbershopApp() {
     setActiveCustomerTab("booking");
   };
 
+  // ========================================================
+  // VIEW 1: LANDING PAGE
+  // ========================================================
+  if (currentView === "landing") {
+    return (
+      <>
+        <ToastContainer toasts={toasts} onDismiss={removeToast} />
+        <LandingPage
+          onGoToLogin={() => setCurrentView("login")}
+          onExploreAsGuest={() => {
+            setCurrentRole("customer");
+            setCurrentView("app");
+          }}
+          services={services}
+          barbers={barbers}
+          isDark={isDark}
+          onThemeToggle={() => setTheme(isDark ? "light" : "dark")}
+        />
+      </>
+    );
+  }
+
+  // ========================================================
+  // VIEW 2: LOGIN PAGE (GOOGLE & EMAIL/PASS WITH AUTO ROLE)
+  // ========================================================
+  if (currentView === "login") {
+    return (
+      <>
+        <ToastContainer toasts={toasts} onDismiss={removeToast} />
+        <LoginPage
+          onLoginSuccess={handleLoginSuccess}
+          onBackToLanding={() => setCurrentView("landing")}
+          isDark={isDark}
+        />
+      </>
+    );
+  }
+
+  // ========================================================
+  // VIEW 3: MAIN APP (CUSTOMER & ADMIN POS VIEWS)
+  // ========================================================
   return (
     <div
-      className={`min-h-screen flex flex-col transition-colors duration-200 font-sans selection:bg-amber-500 selection:text-slate-950 ${
+      className={`min-h-screen flex flex-col pb-16 md:pb-0 transition-colors duration-200 font-sans selection:bg-amber-500 selection:text-slate-950 ${
         isDark
           ? "bg-slate-950 text-slate-100"
           : "bg-stone-50 text-stone-900"
@@ -254,10 +345,13 @@ export default function BarbershopApp() {
 
       {/* Main Responsive Navbar */}
       <Navbar
+        authUser={authUser}
         currentRole={currentRole}
-        isAdminLoggedIn={isAdminLoggedIn}
+        isAdminLoggedIn={authUser?.role === "admin"}
         onRoleToggle={handleRoleToggle}
-        onAdminLogout={handleAdminLogout}
+        onLogout={handleLogout}
+        onGoToLanding={() => setCurrentView("landing")}
+        onGoToLogin={() => setCurrentView("login")}
         theme={theme}
         onThemeToggle={() => setTheme(isDark ? "light" : "dark")}
         onOpenCheckBooking={() => setIsCheckBookingModalOpen(true)}
@@ -268,7 +362,7 @@ export default function BarbershopApp() {
       {/* Hero Brand Banner for Customer View */}
       {currentRole === "customer" && activeCustomerTab === "booking" && (
         <div
-          className={`border-b py-10 px-4 sm:px-6 relative overflow-hidden transition ${
+          className={`border-b py-8 sm:py-10 px-4 sm:px-6 relative overflow-hidden transition ${
             isDark
               ? "bg-gradient-to-r from-slate-950 via-slate-900 to-amber-950/40 border-slate-800/80"
               : "bg-gradient-to-r from-amber-100/90 via-amber-50 to-stone-100 border-amber-200/80"
@@ -283,7 +377,7 @@ export default function BarbershopApp() {
                 <Scissors className="w-4 h-4" />
                 THE GENTLEMAN&apos;S CUT • JAKARTA
               </span>
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold font-serif tracking-tight">
+              <h1 className="text-2xl sm:text-4xl lg:text-5xl font-extrabold font-serif tracking-tight">
                 Penampilan Sempurna, <br className="hidden sm:inline" />
                 Dimulai dari Kursi Kami.
               </h1>
@@ -293,32 +387,32 @@ export default function BarbershopApp() {
             </div>
 
             {/* Quick Stats Badges */}
-            <div className="flex flex-wrap sm:flex-col gap-3 shrink-0">
+            <div className="flex flex-row md:flex-col gap-2.5 shrink-0">
               <div
-                className={`p-3.5 rounded-2xl border flex items-center gap-3 backdrop-blur-sm ${
+                className={`p-3 rounded-2xl border flex items-center gap-2.5 backdrop-blur-sm ${
                   isDark ? "bg-slate-900/80 border-slate-800" : "bg-white/90 border-amber-200 shadow-sm"
                 }`}
               >
                 <div className="p-2 rounded-xl bg-amber-500/10 text-amber-500">
-                  <Star className="w-5 h-5 fill-amber-500 text-amber-500" />
+                  <Star className="w-4 h-4 fill-amber-500 text-amber-500" />
                 </div>
                 <div>
-                  <span className="font-bold text-sm block">4.9 / 5.0 Rating</span>
-                  <span className="text-[11px] opacity-70">500+ Pelanggan Puas</span>
+                  <span className="font-bold text-xs sm:text-sm block">4.9 / 5.0 Rating</span>
+                  <span className="text-[10px] opacity-70">500+ Pelanggan Puas</span>
                 </div>
               </div>
 
               <div
-                className={`p-3.5 rounded-2xl border flex items-center gap-3 backdrop-blur-sm ${
+                className={`p-3 rounded-2xl border flex items-center gap-2.5 backdrop-blur-sm ${
                   isDark ? "bg-slate-900/80 border-slate-800" : "bg-white/90 border-amber-200 shadow-sm"
                 }`}
               >
                 <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500">
-                  <Clock className="w-5 h-5" />
+                  <Clock className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="font-bold text-sm block">Buka Setiap Hari</span>
-                  <span className="text-[11px] opacity-70">09:00 - 21:00 WIB</span>
+                  <span className="font-bold text-xs sm:text-sm block">Buka Setiap Hari</span>
+                  <span className="text-[10px] opacity-70">09:00 - 21:00 WIB</span>
                 </div>
               </div>
             </div>
@@ -498,11 +592,24 @@ export default function BarbershopApp() {
         )}
       </main>
 
+      {/* Mobile Bottom Navigation Bar (Phone App Shell) */}
+      <MobileBottomNav
+        currentRole={currentRole}
+        activeCustomerTab={activeCustomerTab}
+        setActiveCustomerTab={setActiveCustomerTab}
+        activeAdminTab={activeAdminTab}
+        setActiveAdminTab={setActiveAdminTab}
+        onOpenCheckBooking={() => setIsCheckBookingModalOpen(true)}
+        onGoToLanding={() => setCurrentView("landing")}
+        onLogout={handleLogout}
+        isDark={isDark}
+      />
+
       {/* Modals */}
       <AdminLoginModal
         isOpen={isAdminLoginModalOpen}
         onClose={() => setIsAdminLoginModalOpen(false)}
-        onLoginSuccess={handleAdminLoginSuccess}
+        onLoginSuccess={handleAdminModalLoginSuccess}
         isDark={isDark}
       />
 
@@ -531,7 +638,7 @@ export default function BarbershopApp() {
 
       {/* Footer */}
       <footer
-        className={`border-t py-8 px-4 sm:px-6 lg:px-8 text-xs transition ${
+        className={`border-t py-8 px-4 sm:px-6 lg:px-8 text-xs transition hidden md:block ${
           isDark
             ? "bg-slate-950/80 border-slate-900 text-slate-500"
             : "bg-white border-amber-200 text-stone-500"
@@ -553,6 +660,13 @@ export default function BarbershopApp() {
           </div>
 
           <div className="flex flex-wrap items-center gap-4 text-xs font-medium">
+            <span
+              onClick={() => setCurrentView("landing")}
+              className="cursor-pointer hover:text-amber-500 transition"
+            >
+              Beranda
+            </span>
+            <span>•</span>
             <span
               onClick={() => {
                 setCurrentRole("customer");
