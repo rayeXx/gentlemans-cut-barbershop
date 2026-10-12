@@ -16,6 +16,7 @@ import {
   INITIAL_BOOKINGS, 
   INITIAL_SUBSCRIPTIONS 
 } from "@/lib/mockData";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { LandingPage } from "@/components/landing/LandingPage";
 import { LoginPage } from "@/components/auth/LoginPage";
 import { Navbar } from "@/components/Navbar";
@@ -117,6 +118,47 @@ export default function BarbershopApp() {
         setCurrentRole(parsedUser.role);
         setCurrentView("app");
       }
+
+      // Check Supabase session for Google Login
+      if (isSupabaseConfigured && supabase) {
+        supabase.auth.getUser().then(({ data: { user } }) => {
+          if (user) {
+            const email = user.email || "";
+            const role = email.toLowerCase().includes("admin") ? "admin" : "customer";
+            const loggedUser: AuthUser = {
+              id: user.id,
+              name: user.user_metadata?.full_name || email.split("@")[0] || "User Google",
+              email,
+              avatar: user.user_metadata?.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+              role,
+              provider: "google",
+            };
+            setAuthUser(loggedUser);
+            setCurrentRole(role);
+            setCurrentView("app");
+          }
+        });
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+          if (session?.user) {
+            const email = session.user.email || "";
+            const role = email.toLowerCase().includes("admin") ? "admin" : "customer";
+            const loggedUser: AuthUser = {
+              id: session.user.id,
+              name: session.user.user_metadata?.full_name || email.split("@")[0] || "User Google",
+              email,
+              avatar: session.user.user_metadata?.avatar_url || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+              role,
+              provider: "google",
+            };
+            setAuthUser(loggedUser);
+            setCurrentRole(role);
+            setCurrentView("app");
+          }
+        });
+
+        return () => subscription.unsubscribe();
+      }
     } catch (e) {
       console.error("Failed to load local database", e);
     } finally {
@@ -166,7 +208,10 @@ export default function BarbershopApp() {
   };
 
   // Handle Logout
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    if (isSupabaseConfigured && supabase) {
+      await supabase.auth.signOut();
+    }
     setAuthUser(null);
     setCurrentRole("customer");
     setCurrentView("landing");

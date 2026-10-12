@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { AuthUser } from "@/types/barbershop";
 import { GoogleIcon } from "@/components/GoogleIcon";
+import { signInWithGoogle, isSupabaseConfigured } from "@/lib/supabase";
 import { 
   Scissors, 
   Mail, 
@@ -107,10 +108,27 @@ export function LoginPage({ onLoginSuccess, onBackToLanding, isDark }: LoginPage
     }, 500);
   };
 
+  const handleGoogleClick = async () => {
+    setIsLoading(true);
+    setErrorMsg(null);
+    try {
+      if (isSupabaseConfigured) {
+        await signInWithGoogle();
+      } else {
+        setIsGoogleModalOpen(true);
+        setIsLoading(false);
+      }
+    } catch (err: unknown) {
+      const error = err as Error;
+      setErrorMsg(error.message || "Gagal menghubungi Google OAuth");
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div
       className={`min-h-screen flex flex-col justify-between p-4 sm:p-6 font-sans relative overflow-hidden transition-colors duration-200 ${
-        isDark ? "bg-slate-950 text-slate-100" : "bg-stone-50 text-stone-900"
+        isDark ? "bg-slate-950 text-slate-100" : "bg-[#FDFBF7] text-stone-900"
       }`}
     >
       {/* Background Glow */}
@@ -175,15 +193,24 @@ export function LoginPage({ onLoginSuccess, onBackToLanding, isDark }: LoginPage
           <div className="space-y-3">
             <button
               type="button"
-              onClick={() => setIsGoogleModalOpen(true)}
+              onClick={handleGoogleClick}
               disabled={isLoading}
               className="w-full flex items-center justify-center gap-3 bg-white hover:bg-stone-100 text-stone-800 border border-stone-300 font-medium py-3 px-4 rounded-xl shadow-md transition-all duration-200 transform active:scale-98 group disabled:opacity-70"
             >
-              <GoogleIcon className="w-5 h-5 group-hover:scale-105 transition-transform" />
+              {isLoading ? (
+                <div className="w-5 h-5 border-2 border-stone-400 border-t-stone-800 rounded-full animate-spin" />
+              ) : (
+                <GoogleIcon className="w-5 h-5 group-hover:scale-105 transition-transform" />
+              )}
               <span className="text-xs sm:text-sm font-semibold tracking-wide">
-                Lanjutkan dengan Google (Gmail)
+                {isLoading ? "Menghubungkan ke Google..." : "Lanjutkan dengan Google (Gmail)"}
               </span>
             </button>
+            {isSupabaseConfigured && (
+              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono block text-center">
+                ● Supabase &amp; Google Cloud Terhubung
+              </span>
+            )}
 
             <div className="relative flex items-center justify-center my-4">
               <div className="border-t border-slate-800/60 w-full" />
